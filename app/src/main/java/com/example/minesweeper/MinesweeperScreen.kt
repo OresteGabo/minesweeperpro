@@ -180,31 +180,37 @@ fun GameTimer(
     isGameActive: Boolean,
     isGameOver: Boolean,
     isGameWon: Boolean,
+    onTick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var seconds by remember { mutableIntStateOf(0) }
+    // 1. Only one source of truth for time
+    var totalSeconds by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(isGameActive) {
-        if (!isGameActive) {
-            seconds = 0
+    // 2. Reset timer when game is reset (not active and not over)
+    LaunchedEffect(isGameActive, isGameOver) {
+        if (!isGameActive && !isGameOver) {
+            totalSeconds = 0
+            onTick(0)
         }
     }
 
+    // 3. Single Timer Loop
     LaunchedEffect(isGameActive, isGameOver, isGameWon) {
+        // Start ticking ONLY if game is active and not over
         if (isGameActive && !isGameOver && !isGameWon) {
             while (true) {
                 delay(1000L)
-                if (isGameActive && !isGameOver && !isGameWon) {
-                    seconds = (seconds + 1).coerceAtMost(9999)
-                }
+                totalSeconds = (totalSeconds + 1).coerceAtMost(9999)
+                onTick(totalSeconds)
             }
         }
     }
 
-    val timeDisplay = "%04d".format(seconds)
+    // 4. UI Rendering
+    val timeDisplay = "%04d".format(totalSeconds)
 
     Text(
-        text = timeDisplay,
+        text = "⏱️ $timeDisplay",
         fontSize = 20.sp,
         fontWeight = FontWeight.Bold,
         fontFamily = FontFamily.Monospace,
@@ -213,7 +219,6 @@ fun GameTimer(
             .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     )
-
 }
 
 // -------------------------------------------------------------------------
@@ -230,6 +235,7 @@ fun MinesweeperScreen(modifier: Modifier = Modifier) {
     var gridWidth by remember { mutableIntStateOf(GRID_WIDTH_DEFAULT) }
     var gridHeight by remember { mutableIntStateOf(GRID_HEIGHT_DEFAULT) }
     var bombCount by remember { mutableIntStateOf(Difficulty.CUSTOM.mines) }
+    var seconds by remember { mutableIntStateOf(0) }
 
     var isGameActive by remember { mutableStateOf(false) }
 
@@ -256,6 +262,7 @@ fun MinesweeperScreen(modifier: Modifier = Modifier) {
         gameOver = false
         gameWon = false
         isGameActive = false
+        seconds = 0
         gameKey++
         boardUpdateTrigger++
         // Reset zoom state on restart
@@ -350,6 +357,7 @@ fun MinesweeperScreen(modifier: Modifier = Modifier) {
                     isGameActive = isGameActive,
                     isGameOver = gameOver,
                     isGameWon = gameWon,
+                    onTick = { seconds = it },
                     modifier = Modifier.align(Alignment.CenterVertically)
                 )
 
@@ -647,4 +655,10 @@ fun ReferenceDialog(onDismiss: () -> Unit) {
             }
         }
     )
+}
+
+fun formatTime(seconds: Int): String {
+    val mins = seconds / 60
+    val secs = seconds % 60
+    return "%02d:%02d".format(mins, secs)
 }
